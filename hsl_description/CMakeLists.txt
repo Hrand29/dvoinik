@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.5)
+project(hsl_description)
+
+find_package(ament_cmake REQUIRED)
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY meshes
+  DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY rviz
+  DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY urdf
+  DESTINATION share/${PROJECT_NAME})
+
+install(PROGRAMS
+  scripts/wheel_encoders_bridge.py
+  scripts/gyro_imu_bridge.py
+  scripts/livox_imu_bridge.py
+  scripts/livox_lidar_bridge.py
+  DESTINATION lib/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_package()

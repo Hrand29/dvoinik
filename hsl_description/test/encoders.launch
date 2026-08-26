@@ -1,0 +1,14 @@
+<launch>
+    <!-- Загружаем параметры энкодеров -->
+    <rosparam file="$(find synergy)/config/encoders.yaml" command="load"/>
+    
+    <!-- Запускаем узел эмуляции энкодеров -->
+    <node name="wheel_encoders" pkg="synergy" type="wheel_encoders.py" output="screen">
+        <param name="ticks_per_revolution" value="4096"/>
+        <param name="gear_ratio" value="1.0"/>
+        <param name="add_noise" value="true"/>
+        <param name="noise_stddev" value="2.0"/>
+        <param name="publish_rate" value="100"/>
+    </node>
+</launch>
+

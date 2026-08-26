@@ -1,0 +1,313 @@
+<?xml version="1.0"?>
+<!--
+  Мачта под платформу с Livox MID-360.
+
+  Первый черновой проход: только стойки (цилиндры) от base_link до высоты,
+  на которой должна встать платформа с лидаром. Платформа и сам лидар
+  добавляются отдельным шагом после того, как геометрия стоек подогнана
+  визуально/по факту.
+
+  Все размеры ниже — заглушки, без реального робота под рукой их нельзя
+  взять иначе как на глаз. Помечены TODO там, где потребуется правка после
+  осмотра в RViz или после получения реальных размеров.
+-->
+<robot name="mast" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find hsl_description)/urdf/common_properties.urdf.xacro"/>
+
+  <!-- ============ Параметры ============ -->
+
+  <!-- Высота крепления лидара над base_link.
+       Это НЕ гадание: значение взято из штатного static TF base_link -> livox,
+       который публикует mid360.launch.py реального робота (z=0.3). -->
+  <xacro:property name="lidar_z_from_base" value="0.30"/>
+
+  <!-- Толщина будущей платформы под лидар (пока не сделана — заглушка) -->
+  <xacro:property name="platform_thickness" value="0.01"/>
+
+  <!-- Верх мачты = отметка, где будет лежать платформа -->
+  <xacro:property name="mast_top_z" value="${lidar_z_from_base - platform_thickness}"/>
+
+  <!-- Низ стоек. По умолчанию — верх корпуса kobuki, см. base_link collision
+       в kobuki.urdf.xacro: origin z=0.05949, length=0.10938 -> верх 0.11418.
+       TODO: поправить, если стойки физически крепятся не сюда. -->
+  <xacro:property name="mast_base_z" value="0.08"/>
+
+  <xacro:property name="mast_height" value="${mast_top_z - mast_base_z}"/>
+
+  <!-- Геометрия одной стойки (цилиндр). TODO: реальный радиус/материал профиля -->
+  <xacro:property name="mast_radius" value="0.008"/>
+  <xacro:property name="mast_mass" value="0.05"/>
+
+  <!-- Радиус окружности, на которой стоят стойки (< радиуса базы 0.178).
+       TODO: подогнать под реальное расположение креплений на корпусе. -->
+  <xacro:property name="mast_mount_radius" value="0.1"/>
+
+  <!-- Платформа на верхушках стоек. TODO: реальные размеры плиты -->
+  <xacro:property name="platform_length" value="0.25"/>
+  <xacro:property name="platform_width" value="0.25"/>
+  <xacro:property name="platform_mass" value="0.1"/>
+
+  <!-- Линк-заглушка под лидар: просто цилиндр, к нему позже крепится
+       Gazebo-плагин/сенсор Livox MID-360. Размеры примерно по габаритам
+       корпуса MID-360 (~65x65x60мм), но это не финальная геометрия сенсора,
+       а точка крепления — TODO уточнить при добавлении самого плагина. -->
+  <xacro:property name="lidar_mount_radius" value="0.033"/>
+  <xacro:property name="lidar_mount_height" value="0.06"/>
+  <xacro:property name="lidar_mount_mass" value="0.1"/>
+
+  <!-- ============ Одна стойка ============ -->
+  <xacro:macro name="mast_strut" params="suffix x y">
+    <joint name="mast_strut_${suffix}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="mast_strut_${suffix}_link"/>
+      <origin xyz="${x} ${y} ${mast_base_z + mast_height/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="mast_strut_${suffix}_link">
+      <visual>
+        <geometry>
+          <cylinder length="${mast_height}" radius="${mast_radius}"/>
+        </geometry>
+        <xacro:insert_block name="material_dark_grey"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder length="${mast_height}" radius="${mast_radius}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${mast_mass}"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0"
+                 iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <!-- ============ Мачта целиком ============ -->
+  <xacro:macro name="mast">
+    <!-- 4 стойки крестом. TODO: подогнать количество и расположение -->
+    <xacro:mast_strut suffix="1" x="${mast_mount_radius}" y="${mast_mount_radius}"/>
+    <xacro:mast_strut suffix="2" x="${-mast_mount_radius}" y="${mast_mount_radius}"/>
+    <xacro:mast_strut suffix="3" x="${mast_mount_radius}" y="${-mast_mount_radius}"/>
+    <xacro:mast_strut suffix="4" x="${-mast_mount_radius}" y="${-mast_mount_radius}"/>
+
+    <!-- Виртуальная (безразмерная) точка на верху мачты. Следующим шагом
+         платформа крепится сюда fixed-joint'ом с нулевым/малым offset'ом,
+         вместо пересчёта абсолютного положения от base_link заново. -->
+    <joint name="mast_top_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="mast_top_link"/>
+      <origin xyz="0 0 ${mast_top_z}" rpy="0 0 0"/>
+    </joint>
+    <link name="mast_top_link"/>
+
+    <!-- ============ Платформа: лежит на верхушках стоек ============ -->
+    <joint name="platform_joint" type="fixed">
+      <parent link="mast_top_link"/>
+      <child link="platform_link"/>
+      <origin xyz="0 0 ${platform_thickness/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="platform_link">
+      <visual>
+        <geometry>
+          <box size="${platform_length} ${platform_width} ${platform_thickness}"/>
+        </geometry>
+        <xacro:insert_block name="material_light_grey"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="${platform_length} ${platform_width} ${platform_thickness}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${platform_mass}"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.0005" ixy="0" ixz="0"
+                 iyy="0.0005" iyz="0" izz="0.0005"/>
+      </inertial>
+    </link>
+
+    <!-- ============ Линк под лидар: висит ПОД платформой ============
+         Верхняя грань цилиндра касается нижней грани платформы, сам
+         цилиндр целиком ниже platform_link, а не сверху на ней.
+
+         Ориентация (rpy) ВЗЯТА с реального static TF base_link -> livox
+         (mid360.launch.py: static_transform_publisher x y z yaw pitch roll =
+         0 0 0.3 {PI/2} {PI} 0 -> в терминах URDF rpy=roll pitch yaw = 0 π π/2).
+         Это не декоративная деталь: IMU внутри MID-360 физически развёрнут
+         вместе с корпусом лидара, и если не повторить эту ориентацию тут,
+         симулированные gyro/accel будут репортить данные в развёрнутых
+         осях относительно реального сенсора (гравитация попадёт не на ту
+         ось, знаки будут другие).
+
+         TODO: высота (z) всё ещё placeholder — mast_top_z считался в
+         предположении "лидар сверху платформы", а сенсор висит снизу,
+         финальную высоту точки крепления стоит сверить с z=0.3 отдельно
+         (ориентации это не касается, там всё уже верно). -->
+    <joint name="lidar_mount_joint" type="fixed">
+      <parent link="platform_link"/>
+      <child link="lidar_mount_link"/>
+      <origin xyz="0 0 ${-platform_thickness/2 - lidar_mount_height/2}" rpy="0 ${M_PI} ${M_PI/2}"/>
+    </joint>
+    <link name="lidar_mount_link">
+      <visual>
+        <geometry>
+          <cylinder length="${lidar_mount_height}" radius="${lidar_mount_radius}"/>
+        </geometry>
+        <xacro:insert_block name="material_black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder length="${lidar_mount_height}" radius="${lidar_mount_radius}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${lidar_mount_mass}"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0"
+                 iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+    </link>
+
+    <!-- Безразмерный TF-фрейм "livox" точно на месте lidar_mount_link (нулевой
+         offset). На реальном роботе это ОТДЕЛЬНЫЙ static_transform_publisher
+         из mid360.launch.py (base_link -> livox, см. секцию про сенсоры выше)
+         — сам по себе не часть его URDF-дерева. livox_lidar_bridge.py уже
+         публикует PointCloud2 с frame_id="livox" (как и реальный робот), но
+         без этого линка такого TF-фрейма не существовало ВООБЩЕ — RViz не
+         мог зарезолвить точки ни в каком Fixed Frame (проверено вживую:
+         "Message Filter dropping message... queue is full" не переставая). -->
+    <joint name="livox_joint" type="fixed">
+      <parent link="lidar_mount_link"/>
+      <child link="livox"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="livox"/>
+
+    <!-- ============ 6-осевой IMU внутри Livox MID-360 (ICM-40609) ============
+         Публикует "сырой" физически честный IMU на скрытый топик
+         _raw/livox_imu — обрезку/переформатирование до точной семантики
+         реального livox_ros_driver2 (lddc.cpp::InitImuMsg) делает
+         scripts/livox_imu_bridge.py, который и публикует итоговый livox/imu.
+
+         <frame_name> нужен в обоих местах (на уровне <sensor> и внутри
+         <ros>) по той же причине, что и у гироскопа kobuki: platform_link
+         -> lidar_mount_link тоже fixed-joint, без явного <frame_name> сенсор
+         унаследует имя корневого слипшегося линка вместо lidar_mount_link
+         (см. ⚠️⚠️ по gyro_link в CLAUDE.md — тот же баг, то же лекарство).
+
+         Шумовые параметры — заглушка (общие "tutorial values", как и у
+         гироскопа kobuki выше), не характеристики реального ICM-40609:
+         точного шума в паспорте сенсора под рукой нет. -->
+    <gazebo reference="lidar_mount_link">
+      <sensor type="imu" name="livox_imu">
+        <plugin name="gazebo_ros_livox_imu_controller" filename="libgazebo_ros_imu_sensor.so">
+          <ros>
+            <remapping>~/out:=_raw/livox_imu</remapping>
+            <frame_name>lidar_mount_link</frame_name>
+          </ros>
+          <frame_name>lidar_mount_link</frame_name>
+        </plugin>
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <visualize>false</visualize>
+        <imu>
+          <noise>
+            <type>gaussian</type>
+            <rate>
+              <mean>0.0</mean>
+              <stddev>${0.0014*0.0014}</stddev>
+              <bias_mean>0.0</bias_mean>
+              <bias_stddev>0.0</bias_stddev>
+            </rate>
+            <accel>
+              <mean>0.0</mean>
+              <stddev>1.7e-2</stddev>
+              <bias_mean>0.1</bias_mean>
+              <bias_stddev>0.001</bias_stddev>
+            </accel>
+          </noise>
+        </imu>
+      </sensor>
+    </gazebo>
+
+    <!-- ============ Лидар Livox MID-360 (сканирующая часть) ============
+         Плагин ros2_livox_simulation (пакет ~/ros2_ws/src/ros2_livox_simulation,
+         форк TGR-Robotics/livox_laser_simulation_ros2, см. CLAUDE.md).
+         Ссылаемся на уже существующий lidar_mount_link (правильно
+         сориентирован под реальный static TF, см. IMU-блок выше) — НЕ
+         используем собственный <link>/<visual> макроса mid360.xacro: тот
+         ссылается на mesh package://venice_robot_description/... (пакета
+         которого у нас нет и не будет — чужой xacro писался под другой
+         проект). Сенсорная часть (scan pattern/шум/плагин) взята из
+         mid360.xacro как есть, only re-attached к нашему линку.
+
+         Плагин публикует ОБА формата, но НЕ равноценно (см. CLAUDE.md,
+         секция "Симуляция лидара"): <topic> — CustomMsg с честной
+         reflectivity, <topic>_PointCloud2 — БЕЗ intensity. Реальный робот
+         публикует именно PointCloud2 с intensity на livox/lidar. Поэтому
+         тут топик СКРЫТЫЙ (_raw/...), а честный livox/lidar с сохранённой
+         intensity собирает scripts/livox_lidar_bridge.py из CustomMsg. -->
+    <xacro:property name="lidar_update_rate" value="50"/>
+    <!-- publish_rate НЕ используется плагином вообще (не читается из SDF,
+         см. CLAUDE.md) — оставлен только чтобы не потерять "какое значение
+         должно бы быть", реального эффекта не даёт. -->
+    <xacro:property name="lidar_publish_rate" value="10"/>
+    <!-- Из реального bag-файла (data/rosbag2_..._static_1m) настоящий
+         livox/lidar даёт ~20000 точек/сообщение на ~8.5Гц. Подобрано
+         эмпирически (ros2 topic hz + сравнение /clock с wall-time):
+         10000 — разумный баланс (реальная частота ~30Гц, real-time factor
+         ~0.68); на 20000 совокупная пропускная способность НЕ растёт (сама
+         частота падает непропорционально сильнее — ~2.7Гц, деградация
+         нелинейная), только просаживает производительность и время
+         старта. Меньше половины точек реального робота на скан, но не
+         из экономии, а потому что 20000 объективно не имеет смысла при
+         текущей производительности плагина. -->
+    <xacro:property name="lidar_samples" value="10000"/>
+    <xacro:property name="lidar_downsample" value="1"/>
+    <xacro:property name="lidar_noise_stddev" value="0.0"/>
+
+    <gazebo reference="lidar_mount_link">
+      <sensor type="ray" name="livox">
+        <pose>0 0 0 0 0 0</pose>
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+        <update_rate>${lidar_update_rate}</update_rate>
+        <plugin name="livox_plugin" filename="libros2_livox.so">
+          <ray>
+            <scan>
+              <horizontal>
+                <samples>240</samples>
+                <resolution>1</resolution>
+                <min_angle>0</min_angle>
+                <max_angle>${2*M_PI}</max_angle>
+              </horizontal>
+              <vertical>
+                <samples>16</samples>
+                <resolution>1</resolution>
+                <min_angle>${-7.0/180.0*M_PI}</min_angle>
+                <max_angle>${55.22/180.0*M_PI}</max_angle>
+              </vertical>
+            </scan>
+            <range>
+              <min>0.1</min>
+              <max>80.0</max>
+              <resolution>0.001</resolution>
+            </range>
+            <noise>
+              <type>gaussian</type>
+              <mean>0.0</mean>
+              <stddev>${lidar_noise_stddev}</stddev>
+            </noise>
+          </ray>
+          <visualize>true</visualize>
+          <samples>${lidar_samples}</samples>
+          <downsample>${lidar_downsample}</downsample>
+          <publish_rate>${lidar_publish_rate}</publish_rate>
+          <csv_file_name>$(find ros2_livox_simulation)/scan_mode/mid360.csv</csv_file_name>
+          <topic>_raw/livox_lidar</topic>
+        </plugin>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+</robot>

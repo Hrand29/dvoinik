@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>livox_ros_driver2</name>
+  <version>1.0.0</version>
+  <description>
+      ТОЛЬКО типы сообщений (CustomPoint/CustomMsg), НЕ реальный драйвер.
+
+      Настоящий livox_ros_driver2 (полный, с самим драйвером под аппаратный
+      SDK) живёт в hackaton/hsl25-master/kobuki/workspace/src/livox_ros_driver2
+      и монтируется в докер-контейнер реального робота — этот файл НЕ трогаем,
+      чтобы не сломать сборку на соревновании.
+
+      Полная сборка настоящего пакета требует liblivox_lidar_sdk_shared.so
+      (реальный Livox SDK под /usr/local/lib), которого на машине разработки
+      нет и не должно быть — это SDK для связи с физическим железом. Но
+      ros2_livox_simulation (Gazebo-плагин лидара) на этапе компиляции просит
+      find_package(livox_ros_driver2 REQUIRED) и
+      include livox_ros_driver2/msg/custom_msg.hpp — только ради самого
+      ТИПА сообщения, реальный драйвер ему не нужен.
+
+      Поэтому здесь — отдельный, специально созданный пакет с тем же именем
+      и msg/CustomPoint.msg + msg/CustomMsg.msg (содержимое один в один
+      скопировано из настоящего пакета, не переименовано), без единой
+      Gazebo/SDK-зависимости. Имя пакета совпадает с настоящим намеренно —
+      иначе пришлось бы патчить исходники ros2_livox_simulation.
+  </description>
+  <maintainer email="komarov.p@gmail.com">HSL25 team</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+
+  <depend>std_msgs</depend>
+  <depend>builtin_interfaces</depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

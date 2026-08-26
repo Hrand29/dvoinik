@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hsl_description</name>
+  <version>1.0.0</version>
+  <description>
+      Рабочая копия URDF-модели kobuki (turtlebot2) для цифрового двойника
+      HSL25. Вынесена из hsl25-master/kobuki/workspace/src/kobuki_ros/kobuki_description
+      в отдельный пакет для удобства разработки — без лишних вложенных папок
+      исходного репозитория организаторов. Меши/материалы: оригинальный
+      kobuki_description (BSD, Yujin Robot / D.Stonier / M.Liebhardt / Y.Ju).
+  </description>
+  <maintainer email="komarov.p@gmail.com">HSL25 team</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>urdf</build_depend>
+  <build_depend>xacro</build_depend>
+
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>gazebo_plugins</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>kobuki_ros_interfaces</exec_depend>
+  <exec_depend>livox_ros_driver2</exec_depend>
+  <exec_depend>ros2_livox_simulation</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <!-- Без этого Gazebo не находит meshes/*.dae по package://hsl_description/...
+         (GAZEBO_MODEL_PATH не подхватывает share-каталог пакета сам по себе,
+         только пакеты с этим экспортом) — примитивы (box/cylinder) рендерились
+         нормально, а mesh-геометрия (main_body.dae, wheel.dae) молча пропадала. -->
+    <gazebo_ros gazebo_model_path="${prefix}/.."/>
+  </export>
+</package>

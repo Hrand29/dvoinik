@@ -1,0 +1,256 @@
+<?xml version="1.0"?>
+
+<robot name="kobuki_sim" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="kobuki_sim">
+	  <gazebo reference="wheel_left_link">
+	    <mu1>1.0</mu1>
+	    <mu2>1.0</mu2>
+	    <kp>1000000.0</kp>
+	    <kd>100.0</kd>
+	    <minDepth>0.001</minDepth>
+	    <maxVel>1.0</maxVel>
+	  </gazebo>
+
+	  <gazebo reference="wheel_right_link">
+	    <mu1>1.0</mu1>
+	    <mu2>1.0</mu2>
+	    <kp>1000000.0</kp>
+	    <kd>100.0</kd>
+	    <minDepth>0.001</minDepth>
+	    <maxVel>1.0</maxVel>
+	  </gazebo>
+
+	  <gazebo reference="caster_front_link">
+	    <mu1>0.0</mu1>
+	    <mu2>0.0</mu2>
+	    <kp>1000000.0</kp>
+	    <kd>100.0</kd>
+	    <minDepth>0.001</minDepth>
+	    <maxVel>1.0</maxVel>
+	  </gazebo>
+
+	  <gazebo reference="caster_back_link">
+	    <mu1>0.0</mu1>
+	    <mu2>0.0</mu2>
+	    <kp>1000000.0</kp>
+	    <kd>100.0</kd>
+	    <minDepth>0.001</minDepth>
+	    <maxVel>1.0</maxVel>
+	  </gazebo>
+
+	  <gazebo reference="base_link">
+	    <mu1>0.3</mu1>
+	    <mu2>0.3</mu2>
+	    <sensor type="contact" name="bumpers">
+	      <always_on>1</always_on>
+	      <update_rate>50.0</update_rate>
+	      <visualize>true</visualize>
+	      <contact>
+	        <collision>base_footprint_fixed_joint_lump__base_collision</collision>
+	      </contact>
+	    </sensor>
+	  </gazebo>
+
+	  <gazebo reference="cliff_sensor_left_link">
+	    <sensor type="ray" name="cliff_sensor_left">
+	      <always_on>true</always_on>
+	      <update_rate>50</update_rate>
+	      <visualize>true</visualize>
+	      <ray>
+	        <scan>
+	          <horizontal>
+	            <samples>50</samples>
+	            <resolution>1.0</resolution>
+	            <min_angle>-0.0436</min_angle>  <!-- -2.5 degree -->
+	            <max_angle>0.0436</max_angle> <!-- 2.5 degree -->
+	          </horizontal>
+			<!-- Can't use vertical rays until this bug is resolved -->
+			<!-- https://bitbucket.org/osrf/gazebo/issue/509/vertical-sensor-doesnt-works -->
+			<!-- <vertical> -->
+			<!--     <samples>50</samples> -->
+			<!--     <resolution>1.0</resolution> -->
+			<!--     <min_angle>-0.0436</min_angle>  -2.5 degree -->
+			<!--     <max_angle>0.0436</max_angle> 2.5 degree -->
+			<!-- </vertical> -->
+	        </scan>
+	        <range>
+	          <min>0.01</min>
+	          <max>0.15</max>
+	          <resolution>1.0</resolution>
+	        </range>
+	      </ray>
+	    </sensor>
+	  </gazebo>
+
+	  <gazebo reference="cliff_sensor_right_link">
+	    <sensor type="ray" name="cliff_sensor_right">
+	      <always_on>true</always_on>
+	      <update_rate>50</update_rate>
+	      <visualize>true</visualize>
+	      <ray>
+	        <scan>
+	          <horizontal>
+	            <samples>50</samples>
+	            <resolution>1.0</resolution>
+	            <min_angle>-0.0436</min_angle>  <!-- -2.5 degree -->
+	            <max_angle>0.0436</max_angle> <!-- 2.5 degree -->
+	          </horizontal>
+			<!-- Can't use vertical rays until this bug is resolved -->
+			<!-- https://bitbucket.org/osrf/gazebo/issue/509/vertical-sensor-doesnt-works -->
+			<!-- <vertical> -->
+			<!--     <samples>50</samples> -->
+			<!--     <resolution>1.0</resolution> -->
+			<!--     <min_angle>-0.0436</min_angle>  -2.5 degree -->
+			<!--     <max_angle>0.0436</max_angle> 2.5 degree -->
+			<!-- </vertical> -->
+	        </scan>
+	        <range>
+	          <min>0.01</min>
+	          <max>0.15</max>
+	          <resolution>1.0</resolution>
+	        </range>
+	      </ray>
+	    </sensor>
+	  </gazebo>
+
+	  <gazebo reference="cliff_sensor_front_link">
+	    <sensor type="ray" name="cliff_sensor_front">
+	      <always_on>true</always_on>
+	      <update_rate>50</update_rate>
+	      <visualize>true</visualize>
+	      <ray>
+	        <scan>
+	          <horizontal>
+	            <samples>50</samples>
+	            <resolution>1.0</resolution>
+	            <min_angle>-0.0436</min_angle>  <!-- -2.5 degree -->
+	            <max_angle>0.0436</max_angle> <!-- 2.5 degree -->
+	          </horizontal>
+			<!-- Can't use vertical rays until this bug is resolved -->
+			<!-- https://bitbucket.org/osrf/gazebo/issue/509/vertical-sensor-doesnt-works -->
+			<!-- <vertical> -->
+			<!--     <samples>50</samples> -->
+			<!--     <resolution>1.0</resolution> -->
+			<!--     <min_angle>-0.0436</min_angle>  -2.5 degree -->
+			<!--     <max_angle>0.0436</max_angle> 2.5 degree -->
+			<!-- </vertical> -->
+	        </scan>
+	        <range>
+	          <min>0.01</min>
+	          <max>0.15</max>
+	          <resolution>1.0</resolution>
+	        </range>
+	      </ray>
+	    </sensor>
+	  </gazebo>
+
+	  <gazebo reference="gyro_link">
+	   <sensor type="imu" name="imu">
+        <!-- ⚠️ base_footprint -> base_link -> gyro_link соединены fixed-joint'ами,
+             URDF->SDF конвертер по умолчанию "склеивает" их в один линк
+             (имя достаётся корневому — base_footprint). Без <frame_name>
+             сенсор репортит frame_id="base_footprint" (проверено вживую) —
+             реальный драйвер жёстко использует "gyro_link"
+             (kobuki_ros.cpp: msg->header.frame_id = "gyro_link"). Это
+             РЕАЛЬНЫЙ, задокументированный механизм (не как command_topic у
+             diff_drive) — gazebo_ros::SensorFrameID() в gazebo_ros/utils.hpp
+             явно читает <frame_name> как override. <body_name>/<output_type>
+             всё же не используются (в SensorFrameID их нет) — убраны. -->
+        <!-- Плагин публикует "сырой" физически честный IMU (все 3 оси
+             orientation/angular_velocity/linear_acceleration) на скрытый
+             топик _raw/gyro_imu — НЕsensors/imu_data напрямую. Реальный
+             kobuki_node (kobuki_ros.cpp::publishInertia()) публикует куда
+             более узкий набор (только yaw + angular_velocity.z, без
+             linear_acceleration вообще — у гироскопа его физически нет),
+             поэтому обрезку до этой семантики делает scripts/gyro_imu_bridge.py
+             и уже он публикует итоговый sensors/imu_data. -->
+        <plugin name="gazebo_ros_imu_controller" filename="libgazebo_ros_imu_sensor.so">
+          <ros>
+            <remapping>~/out:=_raw/gyro_imu</remapping>
+            <frame_name>gyro_link</frame_name>
+          </ros>
+        </plugin>
+        <always_on>true</always_on>
+        <update_rate>50</update_rate>
+        <frame_name>gyro_link</frame_name>
+        <visualize>false</visualize>
+        <imu>
+          <noise>
+            <type>gaussian</type>
+	          <rate>
+	            <mean>0.0</mean>
+	            <stddev>${0.0014*0.0014}</stddev> <!-- 0.25 x 0.25 (deg/s) -->
+	            <bias_mean>0.0</bias_mean>
+	            <bias_stddev>0.0</bias_stddev>
+	          </rate>
+		        <accel> <!-- not used in the plugin and real robot, hence using tutorial values -->
+			        <mean>0.0</mean>
+			        <stddev>1.7e-2</stddev>
+			        <bias_mean>0.1</bias_mean>
+			        <bias_stddev>0.001</bias_stddev>
+		        </accel>
+          </noise>
+	      </imu>
+      </sensor>
+	  </gazebo>
+
+	  <gazebo>
+      <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+        <!-- ⚠️ В этой версии libgazebo_ros_diff_drive.so (Gazebo 11 Classic,
+             gazebo_plugins Humble) плоские теги <command_topic>/<odometry_topic>
+             ИГНОРИРУЮТСЯ несмотря на то, что упомянуты в докстринге заголовка
+             плагина — проверено вживую (лог рапортовал "Subscribed to [/cmd_vel]"
+             при заданном <command_topic>commands/velocity</command_topic>).
+             Переименование топиков у этой версии плагина работает только
+             через <ros><remapping>. Синтаксис сверен с официальным демо-миром
+             пакета: /opt/ros/humble/share/gazebo_plugins/worlds/gazebo_ros_diff_drive_demo.world -->
+        <ros>
+          <!-- Совпадает с реальным драйвером: kobuki_node подписывается именно
+               на "commands/velocity" (geometry_msgs/Twist), а не на "cmd_vel"
+               (см. kobuki_node/src/kobuki_ros.cpp:168) -->
+          <remapping>cmd_vel:=commands/velocity</remapping>
+        </ros>
+        <update_rate>10</update_rate>
+        <left_joint>wheel_left_joint</left_joint>
+        <right_joint>wheel_right_joint</right_joint>
+        <wheel_separation>0.230</wheel_separation>
+        <wheel_diameter>0.070</wheel_diameter>
+        <max_wheel_torque>1.0</max_wheel_torque>
+        <max_wheel_acceleration>1.0</max_wheel_acceleration>
+        <!-- output -->
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>true</publish_odom_tf>
+        <publish_wheel_tf>true</publish_wheel_tf>
+        <!-- odom_publisher_ реального драйвера: nav_msgs/Odometry на "odom",
+             odom_frame="odom", base_frame="base_link" — уже совпадает
+             (см. kobuki_node_params.yaml); default-топик "odom" у плагина
+             и так верный, remapping не нужен -->
+        <odometry_frame>odom</odometry_frame>
+        <robot_base_frame>base_link</robot_base_frame>
+	    </plugin>
+	  </gazebo>
+
+	  <!-- Энкодеры (joint_states): у differential_drive_controller выше есть
+	       тег <publish_wheel_joint_state>, но на практике (проверено вживую:
+	       робот проехал ~0.7м по /odom, а /joint_states всё это время стоял
+	       на 0.0/0.0) в этой версии плагина (Gazebo 11 Classic + gazebo_plugins
+	       Humble) он топик/имена джойнтов заводит правильно, но сами значения
+	       не обновляет. Поэтому энкодеры отдельным, специализированным плагином,
+	       который реально читает положение joint'ов из физики. -->
+	  <gazebo>
+      <plugin name="gazebo_ros_joint_state_publisher" filename="libgazebo_ros_joint_state_publisher.so">
+        <!-- Топик по умолчанию "joint_states" — совпадает с реальным
+             драйвером (sensor_msgs/JointState, имена wheel_left_joint/
+             wheel_right_joint из kobuki_node_params.yaml), remapping не нужен.
+             НЕ покрывает kobuki_ros_interfaces/SensorState на "sensors/core"
+             (сырые тики энкодеров + бампер/cliff/батарея одним сообщением) —
+             это кастомный msg, который штатный gazebo-плагин произвести не
+             может; если код команды читает именно sensors/core, а не
+             joint_states, потребуется отдельный узел-мост. -->
+        <update_rate>10</update_rate>
+        <joint_name>wheel_left_joint</joint_name>
+        <joint_name>wheel_right_joint</joint_name>
+      </plugin>
+	  </gazebo>
+  </xacro:macro>
+</robot>

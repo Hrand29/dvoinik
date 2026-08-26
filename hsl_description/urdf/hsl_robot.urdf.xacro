@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  Standalone URDF цифрового двойника: база kobuki + надстройка (мачта,
+  затем платформа и Livox MID-360). Собирается и разрастается отдельно
+  от kobuki_standalone.urdf.xacro, чтобы не трогать проверенную базу.
+
+  Смотреть: ros2 launch hsl_description robot_description.launch.py urdf_file:=hsl_robot.urdf.xacro
+-->
+<robot name="hsl_robot" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find hsl_description)/urdf/kobuki.urdf.xacro"/>
+  <xacro:include filename="$(find hsl_description)/urdf/mast.urdf.xacro"/>
+
+  <xacro:kobuki/>
+  <xacro:mast/>
+</robot>
