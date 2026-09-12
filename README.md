@@ -1,7 +1,7 @@
 # Цифровой двойник HSL25 — сборка и запуск
 
 Репозиторий содержит цифровой двойник робота HSL25 (kobuki + Livox
-MID-360) для симуляции в Gazebo — **4 ROS2-пакета** в одной папке.
+MID-360) для симуляции в Gazebo — **5 ROS2-пакетов** в одной папке.
 Инструкция для тех, кто получил доступ к этому репозиторию.
 
 Обоснования решений, найденные баги в сторонних плагинах и что ещё не
@@ -16,10 +16,11 @@ git clone <URL этого репозитория> ~/ros2_ws/src/hsl25-digital-tw
 
 (если у вас ещё нет `~/ros2_ws` — сначала `mkdir -p ~/ros2_ws/src`)
 
-Внутри — 4 пакета: `hsl_description/`, `ros2_livox_simulation/`,
-`livox_ros_driver2/`, `kobuki_ros_interfaces/`. Не имеет значения, что
-они лежат на один уровень глубже, чем обычно у пакетов в `src/` —
-`colcon` находит их рекурсивно.
+Внутри — 5 пакетов: `hsl_description/`, `ros2_livox_simulation/`,
+`livox_ros_driver2/`, `kobuki_ros_interfaces/`, `robot_b_detector/`
+(детекция второго робота в облаке точек, задача HSL26 — см. п.9). Не
+имеет значения, что они лежат на один уровень глубже, чем обычно у
+пакетов в `src/` — `colcon` находит их рекурсивно.
 
 ⚠️ Если у вас в этом же workspace ТАКЖЕ будет лежать `hackaton/hsl25-master`
 (архив организаторов, скачанный отдельно) — положите рядом пустой файл
@@ -42,7 +43,7 @@ sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros \
 cd ~/ros2_ws
 source /opt/ros/humble/setup.bash
 colcon build --packages-select kobuki_ros_interfaces livox_ros_driver2 \
-    ros2_livox_simulation hsl_description --symlink-install
+    ros2_livox_simulation hsl_description robot_b_detector --symlink-install
 ```
 
 `--symlink-install` обязателен — без него правки в `urdf/*.xacro`,
@@ -142,6 +143,26 @@ ros2 topic pub /commands/velocity geometry_msgs/msg/Twist '{linear: {x: 0.2}}'
 `/livox/imu` с этапа квалификации, полезны для сверки формата/интенсивности
 с симуляцией. Взять отдельно: *(ссылка/место — уточнить у капитана
 команды)*.
+
+## 9. Детекция второго робота (`robot_b_detector`, задача HSL26)
+
+Пакет `robot_b_detector` ищет в облаке `/livox/lidar` цилиндрическое
+основание второго робота (см. `docs/regulations.md` внутри пакета —
+критерии поимки/обнаружения из регламента HSL26). Чистые numpy-функции
+конвейера — `robot_b_detector/pipeline.py`, ROS2-нода — `detector_node.py`.
+
+Запуск на цифровом двойнике (двойник уже спавнит второго робота по
+умолчанию — см. `gazebo.launch.py` в `hsl_description`):
+
+```bash
+ros2 run robot_b_detector detector_node --ros-args -p use_sim_time:=true
+```
+
+Debug-топики: `/debug/floor_removed` (облако без пола), `/debug/candidate_cluster`
+(кластер-кандидат), `/debug/position` (маркеры позиции в RViz).
+
+`data/` внутри пакета — так же, как и в п.8, bag-записи в `.gitignore`,
+не входят в репозиторий.
 
 ---
 
