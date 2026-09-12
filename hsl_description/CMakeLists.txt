@@ -11,6 +11,8 @@ install(DIRECTORY rviz
   DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY urdf
   DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY worlds
+  DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/wheel_encoders_bridge.py

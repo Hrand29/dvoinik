@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="retro_box">
+    <static>true</static>
+    <link name="link">
+      <pose>1.5 0 0.5 0 0 0</pose>
+      <collision name="collision">
+        <geometry>
+          <box><size>0.5 0.5 0.5</size></box>
+        </geometry>
+        <laser_retro>200</laser_retro>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box><size>0.5 0.5 0.5</size></box>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
+
+

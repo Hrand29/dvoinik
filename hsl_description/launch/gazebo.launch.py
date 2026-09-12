@@ -29,14 +29,72 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import os
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+
+def _spawn_static_robot_b(context, *args, **kwargs):
+    """Спавнит второго робота (та же модель) БЕЗ единого <gazebo>-плагина.
+
+    Диффдрайв, оба IMU и лидар у digital twin'а все глобальные, без
+    namespace (см. CLAUDE.md, раздел HSL26) - если оставить их активными и
+    у второго робота, он будет драться с роботом А за одни и те же топики
+    (commands/velocity, odom, joint_states, _raw/gyro_imu, _raw/livox_imu,
+    _raw/livox_lidar), причём не громко упадёт, а тихо испортит данные
+    робота А подмешанными сообщениями от робота Б. Простое и надёжное
+    решение (без правки общего xacro и без threading'а namespace через все
+    плагины/мосты) - сгенерировать URDF тем же xacro, что и для робота А, и
+    вырезать из него ВСЕ <gazebo>-блоки перед спавном: остаются только
+    link/joint/visual/collision/inertial (геометрия та же, что у реального
+    двойника), полностью отключается любая ROS-публикация И актуация
+    колёс. Итог ровно то, что просили как временный вариант - видимая
+    модель без возможности управления, без конфликтов.
+    """
+    if context.launch_configurations.get('spawn_robot_b', 'true') not in ('true', 'True', '1'):
+        return []
+
+    urdf_file = LaunchConfiguration('urdf_file').perform(context)
+    lidar_samples = LaunchConfiguration('lidar_samples').perform(context)
+    urdf_path = os.path.join(
+        get_package_share_directory('hsl_description'), 'urdf', urdf_file)
+
+    result = subprocess.run(
+        ['xacro', urdf_path, f'lidar_samples:={lidar_samples}'],
+        capture_output=True, text=True, check=True)
+
+    root = ET.fromstring(result.stdout)
+    for gazebo_tag in root.findall('gazebo'):
+        root.remove(gazebo_tag)
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', suffix='_robot_b.urdf', delete=False)
+    tmp.write(ET.tostring(root, encoding='unicode'))
+    tmp.close()
+
+    return [Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        output='screen',
+        arguments=[
+            '-file', tmp.name,
+            '-entity', LaunchConfiguration('robot_b_entity_name').perform(context),
+            '-x', LaunchConfiguration('robot_b_x').perform(context),
+            '-y', LaunchConfiguration('robot_b_y').perform(context),
+            '-Y', LaunchConfiguration('robot_b_yaw').perform(context),
+        ]
+    )]
 
 
 def generate_launch_description():
@@ -47,6 +105,11 @@ def generate_launch_description():
 
     gazebo_launch_path = PathJoinSubstitution(
         [FindPackageShare('gazebo_ros'), 'launch', 'gazebo.launch.py']
+    )
+
+    world_path = PathJoinSubstitution(
+        [FindPackageShare('hsl_description'), 'worlds',
+         [LaunchConfiguration('world'), '.world']]
     )
 
     rviz_config_path = PathJoinSubstitution(
@@ -73,8 +136,13 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             name='gui',
-            default_value='true',
-            description='Запускать gzclient (GUI)'
+            default_value='false',
+            description=(
+                'Запускать gzclient (3D-окно самого Gazebo). По умолчанию '
+                'выключен — дублирует RViz (тот уже показывает модель и '
+                'облако точек), а лишняя нагрузка заметно увеличивает '
+                'задержку потока лидара на загруженной машине (см. CLAUDE.md)'
+            )
         ),
 
         DeclareLaunchArgument(
@@ -83,9 +151,100 @@ def generate_launch_description():
             description='Запускать RViz (модель робота + TF + облако точек лидара)'
         ),
 
+        DeclareLaunchArgument(
+            name='world',
+            default_value='lab1',
+            description=(
+                'Какой мир грузить (worlds/<value>.world в hsl_description): '
+                'lab1 — лабиринт по умолчанию (с двумя выходами — Wall_144/'
+                'Wall_117 убраны), template/lab2 — другие варианты из '
+                'Labirint_bez_prepyatstviy.zip, empty — пустой пол. '
+                'Геометрия мира — это Gazebo, не URDF, поэтому в RViz стены '
+                'лабиринта своей 3D-моделью не отрисуются; но лидар их '
+                'честно сканирует, так что стены всё равно будут видны в '
+                'RViz как облако точек, когда робот к ним подъедет. Чтобы '
+                'разглядеть лабиринт целиком как 3D-сцену — нужен gui:=true '
+                '(дефолт gui остаётся false)'
+            )
+        ),
+
+        DeclareLaunchArgument(
+            name='lidar_samples',
+            default_value='2000',
+            description=(
+                'Лучей на скан лидара (xacro:arg lidar_samples в '
+                'mast.urdf.xacro). Больше — плотнее облако, но выше нагрузка '
+                'и больше задержка потока лидара под конкуренцией за CPU. '
+                '10000 — ближе к реальному роботу (~20000/скан), но '
+                'ощутимо лагает на загрученной машине; 2000 — для '
+                'повседневной разработки'
+            )
+        ),
+
+        DeclareLaunchArgument(
+            name='spawn_x',
+            default_value='-2.55',
+            description=(
+                'Начальная позиция робота А, X (м) — только spawn_entity, '
+                'world/SDF не трогает. Дефолт — угловая ячейка lab1 между '
+                'Wall_156 и Wall_45 (клиренс до стен ~0.42м)'
+            )
+        ),
+        DeclareLaunchArgument(
+            name='spawn_y',
+            default_value='-2.55',
+            description='Начальная позиция робота А, Y (м) — см. spawn_x'
+        ),
+        DeclareLaunchArgument(
+            name='spawn_yaw',
+            default_value='0.0',
+            description='Начальная ориентация робота А, yaw (рад)'
+        ),
+
+        DeclareLaunchArgument(
+            name='spawn_robot_b',
+            default_value='true',
+            description=(
+                'Спавнить второго робота (та же модель, БЕЗ активных '
+                'Gazebo-плагинов — ни диффдрайва, ни IMU, ни лидара, см. '
+                '_spawn_static_robot_b выше: без этого он бы делил '
+                'глобальные топики с роботом А). Статичная модель, колёса '
+                'не актуируются'
+            )
+        ),
+        DeclareLaunchArgument(
+            name='robot_b_entity_name',
+            default_value='robot_b',
+            description='Имя модели робота Б в Gazebo'
+        ),
+        DeclareLaunchArgument(
+            name='robot_b_x',
+            default_value='1.70',
+            description=(
+                'Начальная позиция робота Б, X (м). Дефолт — ячейка lab1 '
+                'между Wall_138 и Wall_140 (клиренс ~0.42м). ⚠️ Значение по '
+                'умолчанию привязано к геометрии именно lab1 — при смене '
+                'world на lab2/template координаты уже не гарантированно '
+                'безопасны'
+            )
+        ),
+        DeclareLaunchArgument(
+            name='robot_b_y',
+            default_value='2.54',
+            description='Начальная позиция робота Б, Y (м) — см. robot_b_x'
+        ),
+        DeclareLaunchArgument(
+            name='robot_b_yaw',
+            default_value='0.0',
+            description='Начальная ориентация робота Б, yaw (рад)'
+        ),
+
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch_path),
-            launch_arguments={'gui': LaunchConfiguration('gui')}.items()
+            launch_arguments={
+                'gui': LaunchConfiguration('gui'),
+                'world': world_path,
+            }.items()
         ),
 
         Node(
@@ -96,7 +255,10 @@ def generate_launch_description():
             parameters=[{
                 'use_sim_time': True,
                 'robot_description': ParameterValue(
-                    Command(['xacro ', urdf_path]), value_type=str)
+                    Command([
+                        'xacro ', urdf_path,
+                        ' lidar_samples:=', LaunchConfiguration('lidar_samples')
+                    ]), value_type=str)
             }]
         ),
 
@@ -104,8 +266,15 @@ def generate_launch_description():
             package='gazebo_ros',
             executable='spawn_entity.py',
             output='screen',
-            arguments=['-topic', 'robot_description', '-entity', LaunchConfiguration('entity_name')]
+            arguments=[
+                '-topic', 'robot_description', '-entity', LaunchConfiguration('entity_name'),
+                '-x', LaunchConfiguration('spawn_x'),
+                '-y', LaunchConfiguration('spawn_y'),
+                '-Y', LaunchConfiguration('spawn_yaw'),
+            ]
         ),
+
+        OpaqueFunction(function=_spawn_static_robot_b),
 
         Node(
             package='rviz2',
