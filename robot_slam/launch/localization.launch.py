@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     return LaunchDescription([
-        # 1. Связь livox -> livox_frame (мост между URDF и bridge)
+        # 1. Связь livox -> livox_frame
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -42,10 +42,10 @@ def generate_launch_description():
             }]
         ),
 
-        # 3. SLAM Toolbox
+        # 3. SLAM Toolbox в режиме локализации
         Node(
             package='slam_toolbox',
-            executable='sync_slam_toolbox_node',
+            executable='localization_slam_toolbox_node',
             name='slam_toolbox',
             output='screen',
             parameters=[{
@@ -54,12 +54,18 @@ def generate_launch_description():
                 'map_frame': 'map',
                 'base_frame': 'base_link',
                 'scan_topic': '/scan',
-                'mode': 'mapping',
-
-                'map_update_interval': 0.5,  # Обновлять карту каждые 0.5 секунды (было ~2 сек)
-                'minimum_travel_distance': 0.1,  # Обновлять карту каждые 10 см движения (было ~0.3 м)
-                'minimum_travel_heading': 0.1,  # Обновлять карту при повороте на 0.1 радиана (~6 градусов)
-                'resolution': 0.05, 
+                'mode': 'localization',
+                
+                # Путь к сохраненной карте (без расширения .yaml)
+                'map_file_name': '/root/hakaton_starline/ros2_ws/src/dvoinik/robot_slam/my_map',
+                
+                # НАЧАЛЬНАЯ ПОЗИЦИЯ РОБОТА (x, y, theta)
+                # Это примерная позиция, где робот находится в Gazebo в момент запуска
+                # Если робот в начале координат, поставь [0.0, 0.0, 0.0]
+                'map_start_pose': [-2.551348, -2.549979, 0.0],
+                
+                'map_update_interval': 0.5,
+                'resolution': 0.05,
             }]
         ),
     ])
