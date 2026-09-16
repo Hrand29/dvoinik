@@ -136,7 +136,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             name='gui',
-            default_value='false',
+            default_value='true',
             description=(
                 'Запускать gzclient (3D-окно самого Gazebo). По умолчанию '
                 'выключен — дублирует RViz (тот уже показывает модель и '
