@@ -16,6 +16,7 @@ install(DIRECTORY worlds
 
 install(PROGRAMS
   scripts/wheel_encoders_bridge.py
+  scripts/odometry_bridge.py
   scripts/gyro_imu_bridge.py
   scripts/livox_imu_bridge.py
   scripts/livox_lidar_bridge.py

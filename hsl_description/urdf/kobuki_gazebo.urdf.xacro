@@ -174,23 +174,26 @@
         <update_rate>50</update_rate>
         <frame_name>gyro_link</frame_name>
         <visualize>false</visualize>
+        <!-- ⚠️⚠️ ФОРМАТ ВАЖЕН: старый <imu><noise><rate>/<accel> (он тут и
+             стоял, унаследован из апстрима kobuki_description) современный
+             Gazebo МОЛЧА ИГНОРИРУЕТ — проверено вживую: с bias_mean=0.1
+             рад/с показания оставались ~0.00005, шума не было вообще.
+             Рабочий формат — поосевой <angular_velocity><x><noise>.
+
+             Значения: stddev 0.0044 рад/с = 0.25 град/с (то, что и имел в
+             виду комментарий в старом блоке, но записанное там
+             ${0.0014*0.0014} давало ~2e-6 — похоже на случайный квадрат).
+             bias_stddev 0.0005 рад/с — это ОЦЕНКА, а не замер: гироскопа
+             базы kobuki нет в bag-записях квалификации (там только
+             /livox/lidar и /livox/imu). Порядок подобран так, чтобы курс
+             уходил примерно на 1-2 град/мин, как у реального kobuki. -->
         <imu>
-          <noise>
-            <type>gaussian</type>
-	          <rate>
-	            <mean>0.0</mean>
-	            <stddev>${0.0014*0.0014}</stddev> <!-- 0.25 x 0.25 (deg/s) -->
-	            <bias_mean>0.0</bias_mean>
-	            <bias_stddev>0.0</bias_stddev>
-	          </rate>
-		        <accel> <!-- not used in the plugin and real robot, hence using tutorial values -->
-			        <mean>0.0</mean>
-			        <stddev>1.7e-2</stddev>
-			        <bias_mean>0.1</bias_mean>
-			        <bias_stddev>0.001</bias_stddev>
-		        </accel>
-          </noise>
-	      </imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.0044</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.0005</bias_stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.0044</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.0005</bias_stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.0044</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.0005</bias_stddev></noise></z>
+          </angular_velocity>
+        </imu>
       </sensor>
 	  </gazebo>
 
@@ -209,6 +212,11 @@
                на "commands/velocity" (geometry_msgs/Twist), а не на "cmd_vel"
                (см. kobuki_node/src/kobuki_ros.cpp:168) -->
           <remapping>cmd_vel:=commands/velocity</remapping>
+          <!-- Сырое счисление по энкодерам уходит на СКРЫТЫЙ топик, не для
+               прямого использования командой. Итоговый "odom" (уже с курсом
+               от гироскопа, как у реального драйвера) публикует
+               scripts/odometry_bridge.py -->
+          <remapping>odom:=_raw/odom</remapping>
         </ros>
         <update_rate>10</update_rate>
         <left_joint>wheel_left_joint</left_joint>
@@ -219,12 +227,22 @@
         <max_wheel_acceleration>1.0</max_wheel_acceleration>
         <!-- output -->
         <publish_odom>true</publish_odom>
-        <publish_odom_tf>true</publish_odom_tf>
+        <!-- ⚠️ TF odom->base_link НЕ от плагина: его публикует
+             odometry_bridge.py, иначе TF (с "сырым" энкодерным курсом) и
+             топик /odom (с курсом от гироскопа) разошлись бы между собой -->
+        <publish_odom_tf>false</publish_odom_tf>
         <publish_wheel_tf>true</publish_wheel_tf>
-        <!-- odom_publisher_ реального драйвера: nav_msgs/Odometry на "odom",
-             odom_frame="odom", base_frame="base_link" — уже совпадает
-             (см. kobuki_node_params.yaml); default-топик "odom" у плагина
-             и так верный, remapping не нужен -->
+        <!-- ⚠️⚠️ ODOMETRY_SOURCE=0 (ENCODER) — критично, дефолт плагина это
+             WORLD, т.е. поза берётся прямо из физики Gazebo и НЕ дрейфует
+             вообще. Проверено живым тестом: робот, упёртый в стену с
+             буксующими колёсами (накрутили 1.17м), давал смещение /odom
+             0.0008м — невозможное поведение для энкодеров, из-за чего SLAM
+             получал идеальный prior и scan matching фактически не
+             проверялся (коррекция map->odom 3см за прогон против 2.26м
+             после переключения). Реальный kobuki считает x,y именно
+             счислением по колёсам (kobuki_node/src/odometry.cpp,
+             ecl::extend_pose) -->
+        <odometry_source>0</odometry_source>
         <odometry_frame>odom</odometry_frame>
         <robot_base_frame>base_link</robot_base_frame>
 	    </plugin>

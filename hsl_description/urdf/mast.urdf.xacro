@@ -211,22 +211,31 @@
         <always_on>true</always_on>
         <update_rate>200</update_rate>
         <visualize>false</visualize>
+        <!-- ⚠️ Формат поосевой (<angular_velocity><x><noise>): старый
+             <imu><noise><rate>/<accel>, который тут стоял, современный
+             Gazebo молча игнорирует — см. подробности у гироскопа kobuki
+             в kobuki_gazebo.urdf.xacro.
+
+             Значения ИЗМЕРЕНЫ по реальной bag-записи квалификации
+             (data/rosbag2_2026_06_27-18_27-static_1m, робот неподвижен,
+             1992 сообщения /livox/imu):
+               gyro:  stddev 0.0011..0.0021 рад/с, смещения по осям
+                      +0.0151 / -0.0045 / -0.0005 рад/с
+               accel: stddev 0.0023..0.0077 g
+             accel здесь задаётся в м/с² (livox_imu_bridge.py делит на 9.81,
+             воспроизводя баг реального драйвера с единицами "g"):
+             0.0077 g * 9.81 = 0.076 м/с². -->
         <imu>
-          <noise>
-            <type>gaussian</type>
-            <rate>
-              <mean>0.0</mean>
-              <stddev>${0.0014*0.0014}</stddev>
-              <bias_mean>0.0</bias_mean>
-              <bias_stddev>0.0</bias_stddev>
-            </rate>
-            <accel>
-              <mean>0.0</mean>
-              <stddev>1.7e-2</stddev>
-              <bias_mean>0.1</bias_mean>
-              <bias_stddev>0.001</bias_stddev>
-            </accel>
-          </noise>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.0015</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.008</bias_stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.0015</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.008</bias_stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.0015</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.008</bias_stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>0.076</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.01</bias_stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>0.076</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.01</bias_stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>0.076</stddev><bias_mean>0.0</bias_mean><bias_stddev>0.01</bias_stddev></noise></z>
+          </linear_acceleration>
         </imu>
       </sensor>
     </gazebo>
@@ -269,7 +278,16 @@
     <xacro:arg name="lidar_samples" default="2000"/>
     <xacro:property name="lidar_samples" value="$(arg lidar_samples)"/>
     <xacro:property name="lidar_downsample" value="1"/>
-    <xacro:property name="lidar_noise_stddev" value="0.0"/>
+    <!-- Шум дальности лидара. ИЗМЕРЕН по реальной записи квалификации
+         (static_1m): фит плоскости стены дал stddev остатков 0.0049 / 0.0067
+         / 0.0043 м на дистанциях ~1 / ~2 / ~3 м -> ~0.005 м. Ноль здесь
+         означал бы идеально чистое облако, какого у реального MID-360 не
+         бывает; для robot_b_detector это важнее, чем для SLAM — его пороги
+         (inlier_thresh=0.02 у плоскости пола, voxel 0.03) подбирались на
+         реальных, шумных данных. lidar_noise_stddev:=0.0 возвращает
+         ground truth, если нужно сравнить. -->
+    <xacro:arg name="lidar_noise_stddev" default="0.005"/>
+    <xacro:property name="lidar_noise_stddev" value="$(arg lidar_noise_stddev)"/>
 
     <gazebo reference="lidar_mount_link">
       <sensor type="ray" name="livox">

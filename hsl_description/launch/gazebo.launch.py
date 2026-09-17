@@ -67,11 +67,13 @@ def _spawn_static_robot_b(context, *args, **kwargs):
 
     urdf_file = LaunchConfiguration('urdf_file').perform(context)
     lidar_samples = LaunchConfiguration('lidar_samples').perform(context)
+    lidar_noise = LaunchConfiguration('lidar_noise_stddev').perform(context)
     urdf_path = os.path.join(
         get_package_share_directory('hsl_description'), 'urdf', urdf_file)
 
     result = subprocess.run(
-        ['xacro', urdf_path, f'lidar_samples:={lidar_samples}'],
+        ['xacro', urdf_path, f'lidar_samples:={lidar_samples}',
+         f'lidar_noise_stddev:={lidar_noise}'],
         capture_output=True, text=True, check=True)
 
     root = ET.fromstring(result.stdout)
@@ -182,6 +184,18 @@ def generate_launch_description():
         ),
 
         DeclareLaunchArgument(
+            name='lidar_noise_stddev',
+            default_value='0.005',
+            description=(
+                'Гауссов шум дальности лидара, м (1 сигма). Дефолт 0.005 '
+                'ИЗМЕРЕН по реальной записи квалификации (static_1m): фит '
+                'плоскости стены дал 0.0043-0.0067 м на 1-3 м. '
+                'lidar_noise_stddev:=0.0 — идеально чистое облако '
+                '(ground truth), для сравнения'
+            )
+        ),
+
+        DeclareLaunchArgument(
             name='spawn_x',
             default_value='-2.55',
             description=(
@@ -257,7 +271,8 @@ def generate_launch_description():
                 'robot_description': ParameterValue(
                     Command([
                         'xacro ', urdf_path,
-                        ' lidar_samples:=', LaunchConfiguration('lidar_samples')
+                        ' lidar_samples:=', LaunchConfiguration('lidar_samples'),
+                        ' lidar_noise_stddev:=', LaunchConfiguration('lidar_noise_stddev')
                     ]), value_type=str)
             }]
         ),
@@ -306,6 +321,20 @@ def generate_launch_description():
             parameters=[{'use_sim_time': True}]
         ),
 
+        # _raw/odom (счисление по энкодерам) + sensors/imu_data (курс
+        # гироскопа) -> odom + TF odom->base_link. Реальный kobuki_node
+        # перезаписывает yaw гироскопом (use_imu_heading=true в конфиге
+        # организаторов), из-за чего у него позиция дрейфует, а курс нет —
+        # см. odometry_bridge.py. Должен идти ПОСЛЕ gyro_imu_bridge, который
+        # и кормит его sensors/imu_data
+        Node(
+            package='hsl_description',
+            executable='odometry_bridge.py',
+            name='odometry_bridge',
+            output='screen',
+            parameters=[{'use_sim_time': True}]
+        ),
+
         # _raw/livox_imu -> livox/imu, переформатирование под точную (в т.ч.
         # дефектную) семантику реального livox_ros_driver2
         Node(
@@ -324,70 +353,5 @@ def generate_launch_description():
             name='livox_lidar_bridge',
             output='screen',
             parameters=[{'use_sim_time': True}]
-        ),
-
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='livox_to_livox_frame',
-            arguments=[
-                '--x', '0', '--y', '0', '--z', '0',
-                '--roll', '0', '--pitch', '0', '--yaw', '0',
-                '--frame-id', 'livox',
-                '--child-frame-id', 'livox_frame'
-            ]
-        ),
-
-        # 2. PointCloud2 -> LaserScan
-        Node(
-            package='pointcloud_to_laserscan',
-            executable='pointcloud_to_laserscan_node',
-            name='pointcloud_to_laserscan',
-            remappings=[
-                ('cloud_in', '/livox/lidar'),
-                ('scan', '/scan')
-            ],
-            parameters=[{
-                'use_sim_time': True,
-                'target_frame': 'livox_frame',
-                'transform_tolerance': 0.05,
-                'min_height': -0.1,
-                'max_height': 0.1,
-                'angle_min': -3.14159,
-                'angle_max': 3.14159,
-                'angle_increment': 0.0087,
-                'scan_time': 0.1,
-                'range_min': 0.5,
-                'range_max': 15.0,
-                'use_inf': True,
-                'concurrency_level': 1,
-            }]
-        ),
-
-        # 3. SLAM Toolbox в режиме локализации
-        Node(
-            package='slam_toolbox',
-            executable='localization_slam_toolbox_node',
-            name='slam_toolbox',
-            output='screen',
-            parameters=[{
-                'use_sim_time': True,
-                'odom_frame': 'odom',
-                'map_frame': 'map',
-                'base_frame': 'base_link',
-                'scan_topic': '/scan',
-                'mode': 'localization',
-                
-                # Путь к сохраненной карте (без расширения .yaml)
-                'map_file_name': '/root/hakaton_starline/ros2_ws/src/dvoinik/robot_slam/my_map',
-                
-                # НАЧАЛЬНАЯ ПОЗИЦИЯ РОБОТА (x, y, theta)
-                # Это примерная позиция, где робот находится в Gazebo в момент запуска
-                # Если робот в начале координат, поставь [0.0, 0.0, 0.0]
-                'map_start_pose': [-2.551348, -2.549979, 0.0],
-                
-                'map_update_interval': 0.5,
-                'resolution': 0.05,
-            }]
         ),
     ])
