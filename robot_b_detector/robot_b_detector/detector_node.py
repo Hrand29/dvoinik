@@ -54,6 +54,23 @@ CROP_MAX_HEIGHT = 0.5
 # регламенту (0.45м между центрами, ближняя точка цели радиусом 0.175м
 # оказалась бы на ~0.275м от base_link - ещё выше порога)
 SELF_FILTER_RADIUS = 0.2
+# Дальше этого расстояния цели физически быть не может: полигон HSL26
+# (worlds/lab1.world) замерен как 5.98 x 5.96 м, то есть самая длинная
+# ПРЯМАЯ видимость внутри лабиринта - около 6 м вдоль стороны (диагональ
+# 8.44 м не считается, её перекрывают стены). Всё, что дальше, приходит
+# снаружи полигона.
+#
+# Зачем: живой тест показал, что часть лучей уходит через проём в стене и
+# бьёт в бесконечную плоскость пола Gazebo - остаточные точки пола
+# насчитывались вплоть до 450 м. Они же давали ложных кандидатов за
+# пределами лабиринта (например (0.38,-3.30) в base_link).
+#
+# ⚠️ Нижние точки при этом НЕ срезаются намеренно: у близкой цели лидар
+# почти не даёт возвратов у самого основания (см. touches_floor_nearby в
+# pipeline.py), а на дальней дистанции точек мало и форма цилиндра -
+# основной признак. Резать низ здесь означало бы бить по детекции там, где
+# она и так слабее всего.
+MAX_DETECTION_RANGE = 6.0
 
 
 class DetectorNode(Node):
@@ -119,7 +136,8 @@ class DetectorNode(Node):
         # /debug/floor_removed выше публикует remaining целиком, без обрезки
         cropped = remaining[remaining[:, 2] < CROP_MAX_HEIGHT]
         radial = np.hypot(cropped[:, 0], cropped[:, 1])
-        cropped = cropped[radial > SELF_FILTER_RADIUS]
+        cropped = cropped[(radial > SELF_FILTER_RADIUS)
+                          & (radial < MAX_DETECTION_RANGE)]
         self._accum_buffer.append((now_sec, cropped))
         while now_sec - self._accum_buffer[0][0] > ACCUMULATION_WINDOW_SEC:
             self._accum_buffer.popleft()
